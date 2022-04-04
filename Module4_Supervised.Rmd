@@ -1,0 +1,194 @@
+---
+title: "Module 4 - Supervised"
+author: "Terry Zhou"
+date: "3/28/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Warm Up
+
+1. Linear regression can be used in machine learning for predictive modeling. It is used to minimize the error of a model and improve predictions. 
+
+2. Lasso and Ridge Regrssion can be used to reduce model complexity and prevent over0fitting. Ridge regression decreases the coefficients and complexity of the model. Lasso regression reduces over-fitting and assists in feature selection.
+
+3. One hot coding is when categorical variables are converted into a form that machine learning algorithms can use to improve their prediction. 
+
+4. R squared is the correlation coefficient and RMSE is the residual mean squared error. 
+
+5. SVMs are support vector machines. They are used for classification, regression, and outliers detection. KNN is k-nearest neighbors algorithm and is a nonparametric supervised learning method. It is used for classification and regression. LDA is linear discriminant analysis and is used for classification, dimension reduction, and data visualization. Logistic regression is a statistical model that uses a logistic function to model the dependent variable. 
+
+6. K-fold cross validation is used to estimate the skill of the model on new data. The k parameter refers to the number of groups that a given dataset will be split into. 
+
+7. input layer, hidden layer, output layer
+
+## Classification
+
+### 1.
+
+```{r}
+data(iris)
+summary(iris)
+library(DataExplorer)
+plot_correlation(iris[, c(1:4)])
+```
+
+### 2.
+
+```{r}
+n <- floor(0.70 * nrow(iris))
+set.seed(123)
+ind <- sample(seq_len(nrow(iris)), size = n)
+train <- iris[ind, ]
+test <- iris[-ind, ]
+
+means <- apply( X = train, MARGIN = 2, FUN = mean )
+std <- apply( X = train, MARGIN = 2, FUN = sd )
+library(dplyr)
+scale1 <- test %>% 
+  sweep( MARGIN = 2, STATS = means, FUN = "-" ) %>% 
+  sweep( MARGIN = 2, STATS = std, FUN = "/" )
+```
+
+### 3. 
+
+```{r}
+library(tidyverse)
+library(reticulate)
+```
+
+## Regression
+
+### 1.
+
+```{r}
+insurance <- read.csv("insurance.csv")
+nrow(insurance)
+```
+
+There are 1338 observations.
+
+### 2. 
+
+```{r}
+str(insurance)
+```
+
+There are 7 variables. The age, charges, BMI, and children variables are numerical and the sex, smoker, and region variables are categorical. 
+
+### 3. 
+
+```{r}
+apply(is.na(insurance), 2, which)
+insurance1 <- insurance[-c(7, 19, 24,28, 51, 61), ]
+```
+
+There are missing values.
+
+### 4. 
+
+```{r}
+summary(insurance1[, c(1, 2, 4, 7)])
+```
+
+### 5. 
+
+```{r}
+hist(insurance$charges, main = "Histogram of Insurance Charges",
+     xlab = "Charges", col = "deeppink3")
+```
+
+The distribution of charges is skew right and not normally distributed. I would log transform the data so that it is more normal.
+
+### 6.
+
+```{r}
+library(caret)
+dummy <- dummyVars(" ~ .", data=insurance1)
+insurance2 <- data.frame(predict(dummy, newdata = insurance1)) 
+```
+
+### 7.
+
+```{r}
+plot_correlation(insurance)
+```
+None of the variables show a strong correlation with charges. 
+
+### 8.
+
+```{r}
+n.1 <- floor(0.70 * nrow(insurance2))
+set.seed(132)
+ind1 <- sample(seq_len(nrow(insurance2)), size = n.1)
+train.i <- insurance2[ind1, ]
+test.i <- insurance2[-ind1, ]
+
+means1 <- apply( X = train.i, MARGIN = 2, FUN = mean )
+std1 <- apply( X = train.i, MARGIN = 2, FUN = sd )
+scale.i <- test.i %>% 
+  sweep( MARGIN = 2, STATS = means1, FUN = "-" ) %>% 
+  sweep( MARGIN = 2, STATS = std1, FUN = "/" )
+```
+
+### 9.
+
+```{r}
+# linear 
+lin <- lm(charges ~ age + sexfemale + sexmale + bmi + children + smokerno + 
+            smokeryes + regionnortheast + regionnorthwest + regionsoutheast + 
+            regionsouthwest, data = train.i)
+summary(lin)
+
+# ridge
+y <- train.i$charges
+x <- data.matrix(train.i[, -c(5)])
+library(glmnet)
+ridge <- glmnet(x, y, alpha = 0)
+summary(ridge)
+
+# lasso
+cv.lasso <- cv.glmnet(x, y, alpha = 1)
+best.lambda <- cv.lasso$lambda.min
+best.lambda
+lasso <- glmnet(x, y, alpha = 1, lambda = best.lambda)
+```
+
+### 10.
+
+```{r}
+test.lin = function(model, df, predictions, target){
+    resids = df[,target] - predictions
+    resids2 = resids**2
+    n = length(predictions)
+    r2 = as.character(round(summary(model)$r.squared, 2))
+    print(r2) 
+}
+predict.lin <- predict(lin, newdata = test.i)
+test.lin(lin, test.i, predict.lin, target = 'charges')
+
+test.ridge <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  r2 <- 1 - SSE / SST
+  print(r2)
+}
+x.test <- as.matrix(test.i[, -c(5)])
+lambdas <- 10^seq(2, -3, by = -.1)
+cv_ridge <- cv.glmnet(x, y, alpha = 0, lambda = lambdas)
+optimal_lambda <- cv_ridge$lambda.min
+optimal_lambda
+predict.ridge <- predict(ridge, s = optimal_lambda, newx = x.test)
+test.ridge(test.i$charges, predict.ridge, test.i)
+
+predict.lasso <- predict(lasso, s = best.lambda, newx = x)
+sst <- sum((y - mean(y))^2)
+sse <- sum((predict.lasso - y)^2)
+r2 <- 1 - sse/sst
+r2
+```
+
+The lasso regression R squared value is 0.9991502, the ridge regression R squared is 0.9799037, and the linear regression R squared value is 0.76. 

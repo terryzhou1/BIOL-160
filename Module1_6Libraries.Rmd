@@ -1,0 +1,37 @@
+---
+title: "Module1"
+author: "Terry Zhou"
+date: "3/27/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 6 Libraries
+
+```{r}
+data(iris)
+head(iris, n = 5)
+```
+
+There are 5 attributes and 150 observations from the dataset.
+
+```{r}
+petal_length <- iris$Petal.Length
+petal_length
+any(is.na(petal_length) == TRUE) 
+```
+
+There are no missing values because none of the values are NA. 
+
+```{r}
+iris[,"Numeric Species Classification"] <- petal_length
+
+iris[, "Petal Length Classification"] <- ifelse(iris$Petal.Length < 3,
+                                                "Short", "Long")
+nrow(subset(iris, iris$`Petal Length Classification` == "Short"))
+```
+
+50 values are assigned "Short".
