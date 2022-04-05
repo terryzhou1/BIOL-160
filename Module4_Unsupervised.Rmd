@@ -1,0 +1,151 @@
+---
+title: "Module 4 - Unsupervised"
+author: "Terry Zhou"
+date: "3/30/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Warm Up
+
+1. Unsupervised learning is a machine learning technique where the model can detect patterns and new information on its own. Thus, the model does not have to be supervised and can deal with untagged data on its own. 
+
+2. K-means clustering is an unsupervised machine learning algorithm that groups similar data points together that looks for k clusters in a dataset. It defines k number of clusters and allocates each data point to the nearest cluster.
+
+3. The Curse of Dimensionality is when there are too many features in the dataset. This makes it difficult to fit the model and may lead to overfitting. 
+
+4. Dimensionality reduction occurs when high dimensional data is transformed to reduce the number of input variables to improve predictive modeling. This is done to help reduce the curse of dimensionality.
+
+5. Multicollinearity is when there is a correlation between the independent variables in a regression. This is an issue because the independent variables should be independent of each other. 
+
+6. PCA is principal component analysis by transforming a larger set of variables into a smaller one that contains as much information as possible from the larger set. It helps solve the multicollinearity problem because it can be used for dimensionality reduction and can be used to identify if multicollinearity is present in a dataset. 
+
+7. The elbow method works by plotting the percent of explained variation as a function of the number of clusters and then picking the sharpest bend in the curve as the number of clusters to use. This elbow in the curve is the point where diminishing returns are no longer worth the additional cost.
+
+8. The silhouette method is used to identify how similar an object is to its own cluster and to other clusters. The clustering is appropriate when most objects have a high silhouette value that shows that the object is well matched to its own cluster, but not to nearby clusters.
+
+## Unsupervised learning
+
+### 1.
+
+```{r}
+library(readxl)
+mice <- read_xls("Data_Cortex_Nuclear.xls")
+nrow(mice)
+```
+There are 108 observations.
+
+### 2. 
+
+```{r}
+ncol(mice)
+```
+
+There are 82 variables. 
+
+### 3.
+
+```{r}
+sum(is.na(mice))
+
+colSums(is.na(mice)) 
+```
+
+### 4.
+
+```{r, fig.height=5, fig.width = 8}
+library(tidyverse)
+library(ggplot2)
+mice %>%
+  mutate(id = row_number()) %>%
+  gather(-id, key = "key", value = "val") %>%
+  mutate(isna = is.na(val)) %>%
+  ggplot(aes(key, id, fill = isna)) + geom_raster(alpha=0.8) + 
+  scale_fill_manual(values = c('steelblue', 'tomato3'), labels = c("Present", "Missing"), name = "") + 
+  labs(x = "Variable", y = "Row Number", title = "Missing values in rows") + 
+  coord_flip()
+```
+
+### 5. 
+
+```{r}
+multi <- cor(na.omit(mice[, 2:78]))
+multi
+```
+
+### 6.
+
+```{r}
+heatmap(multi)
+```
+
+There is multicollinearity because there is a correlation between some of the variables in the datset 
+
+### 7. 
+
+```{r}
+mice1 <- mice[, 2:78]
+mice1 <- apply(mice1, 2, as.numeric)
+for(i in 1:ncol(mice1)) {
+  mice1[ , i][is.na(mice1[ , i])] <- mean(mice1[ , 2], na.rm=TRUE)
+}
+```
+
+I imputed the missing values by replacing them with the mean value for each column. 
+
+### 8. 
+
+```{r}
+pc <- prcomp(mice1, scale = TRUE)
+pc$rotation <- -1*pc$rotation
+pc$rotation
+var <- (pc$sdev ** 2) / sum(pc$sdev ** 2)
+qplot(c(1:77), var) + 
+  geom_line() + 
+  xlab("Principal Component") + ylab("Variance Explained") + 
+  theme_bw()
+var[10]
+```
+
+### 9.
+
+```{r}
+set.seed(123)
+k.max <- 15
+wss <- sapply(1:k.max, 
+              function(k){kmeans(mice1, k, nstart=50,iter.max = 15 )$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+```
+
+The elbow method shows that k = 3. 
+
+### 10. 
+
+```{r}
+library("cluster")
+silhouette_score <- function(k){
+  km <- kmeans(mice1, centers = k, nstart=25)
+  ss <- silhouette(km$cluster, dist(mice1))
+  mean(ss[, 3])
+}
+k <- 2:10
+avg_sil <- sapply(k, silhouette_score)
+plot(k, type='b', avg_sil, xlab='Number of clusters', ylab='Average Silhouette Scores', frame=FALSE)
+```
+
+The silhouette method shows that k = 3. 
+
+### 11.
+
+```{r}
+clusters <- hclust(dist(mice1))
+plot(clusters)
+```
+
